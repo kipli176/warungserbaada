@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% set page_title = "Pemodal" %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <div class="flex items-center justify-between">
+    <nav class="text-sm text-gray-600">
+      <a class="mr-3 hover:underline" href="{{ url_for('penjualan') }}">Penjualan</a>
+      <a class="mr-3 hover:underline" href="{{ url_for('pembeli_page') }}">Pembeli</a>
+      <a class="mr-3 hover:underline" href="{{ url_for('pemodal_page') }}">Pemodal</a>
+      <a class="hover:underline" href="{{ url_for('laporan_page') }}">Laporan</a>
+    </nav>
+  </div>
+
+  <!-- Form Tambah Pemodal -->
+  <section class="bg-white rounded-lg shadow-sm p-4 space-y-3">
+    <h2 class="font-medium">Tambah Pemodal</h2>
+    <form method="post" action="{{ url_for('pemodal_page') }}" class="grid grid-cols-2 gap-3">
+      <div class="col-span-2">
+        <label class="block text-sm mb-1">Nama</label>
+        <input name="name" required class="w-full px-3 py-2 border rounded" placeholder="Nama Pemodal">
+      </div>
+      <div>
+        <label class="block text-sm mb-1">Tahun</label>
+        <input name="year" type="number" min="2000" max="2100" required class="w-full px-3 py-2 border rounded" value="{{ year or '' }}">
+      </div>
+      <div>
+        <label class="block text-sm mb-1">Jumlah (Rp)</label>
+        <input name="amount_idr" type="number" min="0" step="1000" required class="w-full px-3 py-2 border rounded">
+      </div>
+      <div class="col-span-2">
+        <label class="block text-sm mb-1">Catatan</label>
+        <input name="note" class="w-full px-3 py-2 border rounded" placeholder="Opsional">
+      </div>
+      <div class="col-span-2">
+        <button class="w-full py-2 rounded bg-blue-600 text-white hover:bg-blue-700">Simpan</button>
+      </div>
+    </form>
+  </section>
+
+  <!-- Filter Tahun -->
+  <section class="bg-white rounded-lg shadow-sm p-4 space-y-3">
+    <form method="get" action="{{ url_for('pemodal_page') }}" class="flex gap-2">
+      <input name="year" value="{{ year or '' }}" type="number" min="2000" max="2100" class="px-3 py-2 border rounded" placeholder="Filter tahun (opsional)">
+      <button class="px-4 py-2 rounded border hover:bg-gray-100">Terapkan</button>
+    </form>
+  </section>
+
+  <!-- Tabel Pemodal -->
+  <section class="bg-white rounded-lg shadow-sm p-2">
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead class="bg-gray-100">
+          <tr class="text-left">
+            <th class="py-2 px-2">Nama</th>
+            <th class="py-2 px-2">Tahun</th>
+            <th class="py-2 px-2 text-right">Jumlah (Rp)</th>
+            <th class="py-2 px-2">Catatan</th>
+            <th class="py-2 px-2 text-right">Aksi</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for i in investors %}
+          <tr class="{{ 'bg-white' if loop.index0 % 2 else 'bg-gray-50' }}">
+            <td class="py-2 px-2">{{ i.name }}</td>
+            <td class="py-2 px-2">{{ i.year }}</td>
+            <td class="py-2 px-2 text-right">{{ "{:,}".format(i.amount_idr).replace(",", ".") }}</td>
+            <td class="py-2 px-2">{{ i.note or '' }}</td>
+            <td class="py-2 px-2 text-right">
+              <form method="post" action="{{ url_for('pemodal_delete') }}" onsubmit="return confirm('Hapus data ini?')" class="inline">
+                <input type="hidden" name="id" value="{{ i.id }}">
+                <button class="text-xs px-2 py-1 border rounded hover:bg-gray-100">Hapus</button>
+              </form>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td class="py-3 px-2 text-center text-gray-500" colspan="5">Tidak ada data</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Ringkasan per Tahun -->
+  <section class="bg-white rounded-lg shadow-sm p-4">
+    <h2 class="font-medium mb-2">Ringkasan per Tahun</h2>
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead class="bg-gray-100">
+          <tr class="text-left">
+            <th class="py-2 px-2">Tahun</th>
+            <th class="py-2 px-2 text-right">Jumlah Pemodal</th>
+            <th class="py-2 px-2 text-right">Total Uang (Rp)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in summary %}
+          <tr>
+            <td class="py-2 px-2">{{ r.year }}</td>
+            <td class="py-2 px-2 text-right">{{ r.count }}</td>
+            <td class="py-2 px-2 text-right">{{ "{:,}".format(r.total_idr).replace(",", ".") }}</td>
+          </tr>
+          {% else %}
+          <tr><td class="py-3 px-2 text-center text-gray-500" colspan="3">Tidak ada ringkasan</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+</div>
+{% endblock %}

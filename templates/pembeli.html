@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% set page_title = "Pembeli" %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <div class="flex items-center justify-between">
+    <nav class="text-sm text-gray-600">
+      <a class="mr-3 hover:underline" href="{{ url_for('penjualan') }}">Penjualan</a>
+      <a class="mr-3 hover:underline" href="{{ url_for('pembeli_page') }}">Pembeli</a>
+      <a class="mr-3 hover:underline" href="{{ url_for('pemodal_page') }}">Pemodal</a>
+      <a class="hover:underline" href="{{ url_for('laporan_page') }}">Laporan</a>
+    </nav>
+  </div>
+
+  <!-- Form Tambah / Edit Sederhana -->
+  <section class="bg-white rounded-lg shadow-sm p-4 space-y-3">
+    <h2 class="font-medium">Tambah Pembeli</h2>
+    <form method="post" action="{{ url_for('pembeli_page') }}" class="grid grid-cols-2 gap-3">
+      <div class="col-span-2">
+        <label class="block text-sm mb-1">Nama</label>
+        <input name="name" required class="w-full px-3 py-2 border rounded" placeholder="Nama Pembeli">
+      </div>
+      <div>
+        <label class="block text-sm mb-1">Telepon (E.164)</label>
+        <input name="phone_e164" class="w-full px-3 py-2 border rounded" placeholder="+62812xxxxxxx">
+      </div>
+      <div class="flex items-end">
+        <label class="inline-flex items-center gap-2">
+          <input type="checkbox" name="wa_opt_in" value="1" class="accent-blue-600" checked>
+          <span>Terima WA</span>
+        </label>
+      </div>
+      <div class="col-span-2">
+        <label class="block text-sm mb-1">Catatan</label>
+        <input name="note" class="w-full px-3 py-2 border rounded" placeholder="Opsional">
+      </div>
+      <div class="col-span-2">
+        <button class="w-full py-2 rounded bg-blue-600 text-white hover:bg-blue-700">Simpan</button>
+      </div>
+    </form>
+  </section>
+
+  <!-- Pencarian -->
+  <section class="bg-white rounded-lg shadow-sm p-4 space-y-3">
+    <form method="get" action="{{ url_for('pembeli_page') }}" class="flex gap-2">
+      <input name="q" value="{{ q or '' }}" class="flex-1 px-3 py-2 border rounded" placeholder="Cari nama/telepon...">
+      <button class="px-4 py-2 rounded border hover:bg-gray-100">Cari</button>
+    </form>
+    <div class="text-xs text-gray-500">Total data: {{ buyers|length }}</div>
+  </section>
+
+  <!-- Tabel Pembeli -->
+  <section class="bg-white rounded-lg shadow-sm p-2">
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead class="bg-gray-100">
+          <tr class="text-left">
+            <th class="py-2 px-2">Nama</th>
+            <th class="py-2 px-2">Telepon</th>
+            <th class="py-2 px-2">WA</th>
+            <th class="py-2 px-2">Catatan</th>
+            <th class="py-2 px-2 text-right">Aksi</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for b in buyers %}
+          <tr class="{{ 'bg-white' if loop.index0 % 2 else 'bg-gray-50' }}">
+            <td class="py-2 px-2">{{ b.name }}</td>
+            <td class="py-2 px-2">{{ b.phone_e164 or '-' }}</td>
+            <td class="py-2 px-2">{{ 'Ya' if b.wa_opt_in else 'Tidak' }}</td>
+            <td class="py-2 px-2">{{ b.note or '' }}</td>
+            <td class="py-2 px-2 text-right">
+              <form method="post" action="{{ url_for('pembeli_delete') }}" onsubmit="return confirm('Hapus pembeli ini?')" class="inline">
+                <input type="hidden" name="id" value="{{ b.id }}">
+                <button class="text-xs px-2 py-1 border rounded hover:bg-gray-100">Hapus</button>
+              </form>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td class="py-3 px-2 text-center text-gray-500" colspan="5">Tidak ada data</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+</div>
+{% endblock %}

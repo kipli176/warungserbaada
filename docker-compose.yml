@@ -1,0 +1,21 @@
+networks:
+  cloudflared:
+    external: true        # pastikan network ini sudah ada (cloudflared)
+
+services:
+  waserda:
+    image: python:3.11-slim
+    command: sh -c "pip install -r requirements.txt && python app.py"
+    working_dir: /app
+    container_name: waserda
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Jakarta
+    ports:
+      - "5000"       # optional: akses lokal http://localhost:3000
+    volumes:
+      - ./:/app:rw    # serve front-end dari folder host
+      # (opsional) hot-reload server saat dev:
+      # - ../server:/usr/src/app:rw
+    networks:
+      - cloudflared   # agar bisa di-attach ke Cloudflare Tunnel

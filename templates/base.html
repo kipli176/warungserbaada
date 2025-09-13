@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>{{ page_title or 'Kelontong' }}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-gray-50 text-gray-900">
+  <header class="sticky top-0 z-10 bg-white/90 backdrop-blur border-b">
+    <div class="max-w-screen-sm mx-auto px-4 py-3 flex items-center justify-between">
+      <a href="{{ url_for('penjualan') }}" class="font-medium">Kelontong</a>
+      {% if session.get('user') %}
+      <form method="post" action="{{ url_for('logout') }}">
+        <button class="text-sm px-3 py-1.5 rounded border hover:bg-gray-100">Keluar</button>
+      </form>
+      {% endif %}
+    </div>
+  </header>
+
+  <main class="max-w-screen-sm mx-auto px-4 py-4">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="space-y-2 mb-4">
+          {% for category, msg in messages %}
+            <div class="p-3 rounded border {{ 'border-rose-300 bg-rose-50 text-rose-700' if category=='error' else 'border-emerald-300 bg-emerald-50 text-emerald-700' }}">
+              {{ msg }}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    {{ body|safe }}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

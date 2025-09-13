@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+{% set page_title = "Laporan" %}
+
+{% block content %}
+<div class="space-y-6">
+
+
+  <div class="flex items-center justify-between">
+    <nav class="text-sm text-gray-600">
+      <a class="mr-3 hover:underline" href="{{ url_for('penjualan') }}">Penjualan</a>
+      <a class="mr-3 hover:underline" href="{{ url_for('pembeli_page') }}">Pembeli</a>
+      <a class="mr-3 hover:underline" href="{{ url_for('pemodal_page') }}">Pemodal</a>
+      <a class="hover:underline" href="{{ url_for('laporan_page') }}">Laporan</a>
+    </nav>
+  </div>
+
+  <!-- Filter tanggal (berdampak ke Bagi Hasil & Rekap) -->
+  <section class="bg-white rounded-lg shadow-sm p-4 space-y-3">
+    <h2 class="font-medium">Filter Tanggal</h2>
+    <form method="get" action="{{ url_for('laporan_page') }}" class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="block text-sm mb-1">Dari</label>
+        <input name="from" type="date" class="w-full px-3 py-2 border rounded" value="{{ from_date }}">
+      </div>
+      <div>
+        <label class="block text-sm mb-1">Sampai</label>
+        <input name="to" type="date" class="w-full px-3 py-2 border rounded" value="{{ to_date }}">
+      </div>
+      <div class="col-span-2">
+        <button class="w-full py-2 rounded border hover:bg-gray-100">Terapkan</button>
+      </div>
+    </form>
+  </section>
+
+  <!-- Bagi Hasil -->
+  <section class="bg-white rounded-lg shadow-sm p-4 space-y-3">
+    <div class="flex items-center justify-between">
+      <h2 class="font-medium">Bagi Hasil ({{ from_date }} → {{ to_date }})</h2>
+      <span class="text-xs text-gray-500">Sumber: f_profit_sharing()</span>
+    </div>
+
+{% if profit %}
+<div class="grid grid-cols-4 gap-3 text-sm">
+  <div class="p-3 border rounded">
+    <div class="text-gray-500">Total Laba</div>
+    <div class="font-semibold">{{ profit.total_laba|rupiah }}</div>
+  </div>
+  <div class="p-3 border rounded">
+    <div class="text-gray-500">Karyawan (30%)</div>
+    <div class="font-semibold">{{ profit.share_karyawan|rupiah }}</div>
+  </div>
+  <div class="p-3 border rounded">
+    <div class="text-gray-500">Pemodal (35%)</div>
+    <div class="font-semibold">{{ profit.share_pemodal|rupiah }}</div>
+  </div>
+  <div class="p-3 border rounded">
+    <div class="text-gray-500">Kas (35%)</div>
+    <div class="font-semibold">{{ profit.share_kas|rupiah }}</div>
+  </div>
+</div>
+{% else %}
+  <div class="p-3 rounded border border-amber-300 bg-amber-50 text-amber-800 text-sm">
+    Tidak ada data laba pada rentang ini.
+  </div>
+{% endif %}
+
+  </section>
+
+  <!-- Rekap Penjualan Harian -->
+  <section class="bg-white rounded-lg shadow-sm p-4 space-y-3">
+    <div class="flex items-center justify-between">
+      <h2 class="font-medium">Rekap Penjualan Harian</h2>
+      <span class="text-xs text-gray-500">Sumber: v_sales_by_day</span>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead class="bg-gray-100">
+          <tr class="text-left">
+            <th class="py-2 px-2">Tanggal</th>
+            <th class="py-2 px-2 text-right">Transaksi</th>
+            <th class="py-2 px-2 text-right">Penjualan</th>
+            <th class="py-2 px-2 text-right">Modal</th>
+            <th class="py-2 px-2 text-right">Laba</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in rekap %}
+          <tr class="{{ 'bg-white' if loop.index0 % 2 else 'bg-gray-50' }}">
+            <td class="py-2 px-2">{{ r.day }}</td>
+            <td class="py-2 px-2 text-right">{{ r.trx_count|rupiah }}</td>
+            <td class="py-2 px-2 text-right">{{ r.total_penjualan|rupiah }}</td>
+            <td class="py-2 px-2 text-right">{{ r.total_modal|rupiah }}</td>
+            <td class="py-2 px-2 text-right">{{ r.total_laba|rupiah }}</td>
+          </tr>
+          {% else %}
+          <tr><td class="py-3 px-2 text-center text-gray-500" colspan="5">Tidak ada data</td></tr>
+          {% endfor %}
+        </tbody>
+        {% if rekap and rekap|length > 1 %}
+        <tfoot>
+          <tr class="font-semibold">
+            <td class="py-2 px-2 text-right">TOTAL</td>
+            <td class="py-2 px-2 text-right">{{ rekap|map(attribute='trx_count')|sum }}</td>
+            <td class="py-2 px-2 text-right">{{ (rekap|map(attribute='total_penjualan')|sum)|rupiah }}</td>
+            <td class="py-2 px-2 text-right">{{ (rekap|map(attribute='total_modal')|sum)|rupiah }}</td>
+            <td class="py-2 px-2 text-right">{{ (rekap|map(attribute='total_laba')|sum)|rupiah }}</td>
+          </tr>
+        </tfoot>
+        {% endif %}
+      </table>
+    </div>
+  </section>
+
+  <!-- Daftar Transaksi (sesuai filter) -->
+  <section class="bg-white rounded-lg shadow-sm p-4 space-y-3">
+    <div class="flex items-center justify-between">
+      <h2 class="font-medium">Daftar Transaksi</h2>
+      <span class="text-xs text-gray-500">Sumber: sales + buyers</span>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead class="bg-gray-100">
+          <tr class="text-left">
+            <th class="py-2 px-2">Tanggal</th>
+            <th class="py-2 px-2">Pembeli</th>
+            <th class="py-2 px-2 text-right">Penjualan</th>
+            <!--th class="py-2 px-2 text-right">Modal</th>
+            <th class="py-2 px-2 text-right">Laba</th-->
+            <th class="py-2 px-2 text-right">Bayar</th>
+            <!--th class="py-2 px-2 text-right">Kembali</th-->
+            <th class="py-2 px-2">WA</th>
+            <th class="py-2 px-2 text-right">Aksi</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in trx %}
+          <tr class="{{ 'bg-white' if loop.index0 % 2 else 'bg-gray-50' }}">
+            <td class="py-2 px-2 whitespace-nowrap">{{ t.sale_date }}</td>
+            <td class="py-2 px-2">{{ t.buyer_name or '-' }}</td>
+            <td class="py-2 px-2 text-right">{{ t.total_amount|rupiah }}</td>
+            <!--td class="py-2 px-2 text-right">{{ t.total_cost|rupiah }}</td>
+            <td class="py-2 px-2 text-right">{{ t.total_profit|rupiah }}</td-->
+            <td class="py-2 px-2 text-right">{{ t.paid_amount|rupiah }}</td>
+            <!--td class="py-2 px-2 text-right">{{ t.change_amount|rupiah }}</td-->
+            <td class="py-2 px-2">
+              <span class="text-xs px-2 py-1 rounded border
+                {% if t.wa_status=='sent' %} border-emerald-300 bg-emerald-50 text-emerald-700
+                {% elif t.wa_status=='failed' %} border-rose-300 bg-rose-50 text-rose-700
+                {% elif t.wa_status=='pending' %} border-amber-300 bg-amber-50 text-amber-800
+                {% else %} border-gray-300 bg-gray-50 text-gray-700 {% endif %}">
+                {{ t.wa_status }}
+              </span>
+            </td>
+            <td class="py-2 px-2 text-right">
+              <button class="text-xs px-2 py-1 border rounded hover:bg-gray-100"
+                      data-sale-id="{{ t.id }}" onclick="openDetail(this)">Detail</button>
+  <button class="text-xs px-2 py-1 border rounded hover:bg-gray-100
+                 {% if t.wa_status == 'none' %} opacity-50 cursor-not-allowed {% endif %}"
+          data-sale-id="{{ t.id }}" onclick="resendWA(this)"
+          {% if t.wa_status == 'none' %} disabled {% endif %}>
+    Resend&nbsp;WA
+  </button>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td class="py-3 px-2 text-center text-gray-500" colspan="9">Tidak ada transaksi</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Modal Detail Transaksi -->
+  <dialog id="dlgDetail" class="rounded-lg w-full max-w-lg">
+    <form method="dialog" class="p-4 space-y-3">
+      <h3 class="text-lg font-semibold">Detail Transaksi</h3>
+      <div id="detailHeader" class="text-sm text-gray-700"></div>
+      <div class="overflow-x-auto border rounded">
+        <table class="min-w-full text-sm">
+          <thead class="bg-gray-100">
+            <tr class="text-left">
+              <th class="py-2 px-2">Barang</th>
+              <th class="py-2 px-2 text-right">Harga</th>
+              <th class="py-2 px-2 text-right">Qty</th>
+              <th class="py-2 px-2 text-right">Subtotal</th>
+            </tr>
+          </thead>
+          <tbody id="detailBody"></tbody>
+        </table>
+      </div>
+      <div class="flex justify-end">
+        <button class="px-4 py-2 rounded border">Tutup</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script>
+    function fmtIDR(n){ return 'Rp ' + (Number(n||0)).toLocaleString('id-ID'); }
+    async function openDetail(btn){
+      const id = btn.getAttribute('data-sale-id');
+      try{
+        const r = await fetch(`{{ url_for('laporan_sale_detail', sale_id='__ID__') }}`.replace('__ID__', id));
+        if(!r.ok){ alert('Gagal memuat detail'); return; }
+        const js = await r.json();
+        const h = js.header || {};
+        const items = js.items || [];
+        // Header
+        const lines = [];
+        lines.push(`Tanggal: <b>${h.sale_date||'-'}</b>`);
+        lines.push(`Pembeli: <b>${h.buyer_name||'-'}</b>`);
+        lines.push(`Total: <b>${fmtIDR(h.total_amount)}</b> | Bayar: <b>${fmtIDR(h.paid_amount)}</b> | Kembali: <b>${fmtIDR(h.change_amount)}</b>`);
+        document.getElementById('detailHeader').innerHTML = lines.join('<br>');
+        // Body items
+        const tb = document.getElementById('detailBody'); tb.innerHTML='';
+        items.forEach((it, i)=>{
+          const tr = document.createElement('tr');
+          tr.className = i%2 ? 'bg-white' : 'bg-gray-50';
+          tr.innerHTML = `
+            <td class="py-2 px-2">${it.item_name}</td>
+            <td class="py-2 px-2 text-right">${fmtIDR(it.sale_price)}</td>
+            <td class="py-2 px-2 text-right">${it.qty}</td>
+            <td class="py-2 px-2 text-right">${fmtIDR(it.line_total)}</td>
+          `;
+          tb.appendChild(tr);
+        });
+        document.getElementById('dlgDetail').showModal();
+      }catch(e){
+        alert('Gagal memuat detail');
+        console.error(e);
+      }
+    }
+  </script>
+<script>
+  function toast(msg){ alert(msg); } // bisa diganti toast UI
+
+  async function resendWA(btn){
+    const id = btn.getAttribute('data-sale-id');
+    if (!id) return;
+    try{
+      btn.disabled = true;
+      const r = await fetch(`{{ url_for('laporan_resend_wa', sale_id='__ID__') }}`.replace('__ID__', id), {
+        method: 'POST'
+      });
+      const js = await r.json();
+      if(!js.ok){
+        toast(js.error || 'Gagal kirim ulang WA');
+      }else{
+        toast('WA dikirim ulang.');
+        // opsional: reload halaman agar status wa_status ter-update
+        location.reload();
+      }
+    }catch(e){
+      console.error(e);
+      toast('Gagal kirim ulang WA');
+    }finally{
+      btn.disabled = false;
+    }
+  }
+</script>
+
+</div>
+{% endblock %}
