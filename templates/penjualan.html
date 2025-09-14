@@ -2,30 +2,25 @@
 {% set page_title = "Penjualan" %}
 
 {% block content %}
-<div class="space-y-6">
+<style>
+  .sug-item { padding: .5rem .5rem; cursor: pointer; }
+  .sug-item:hover { background: #f3f4f6; } /* gray-100 */
+  .sug-meta { font-size: .75rem; color: #6b7280; } /* text-gray-500 */
+</style>
 
-  <!-- Header nav kecil -->
-  <div class="flex items-center justify-between">
-    <nav class="text-sm text-gray-600">
-      <a class="mr-3 hover:underline" href="{{ url_for('penjualan') }}">Penjualan</a>
-      <a class="mr-3 hover:underline" href="{{ url_for('pembeli_page') }}">Pembeli</a>
-      <a class="mr-3 hover:underline" href="{{ url_for('pemodal_page') }}">Pemodal</a>
-      <a class="hover:underline" href="{{ url_for('laporan_page') }}">Laporan</a>
-    </nav>
-    <span class="text-sm text-gray-500">Login: {{ session.get('user',{}).get('username') }}</span>
-  </div>
+
 
   <!-- Pembeli + tanggal -->
   <section class="bg-white rounded-lg shadow-sm p-4 space-y-3">
     <h2 class="font-medium">Pembeli</h2>
-    <div class="grid grid-cols-1 gap-3">
+    <div class="grid grid-cols-2 gap-3 text-sm">
       <div>
         <label class="block text-sm mb-1">Tanggal</label>
         <input id="tgl" type="date" class="w-full px-3 py-2 border rounded" />
       </div>
       <div>
         <label class="block text-sm mb-1">Pilih Pembeli</label>
-        <select id="buyer" class="w-full px-3 py-2 border rounded">
+        <select id="buyer" class="w-full px-3 py-2 border rounded bg-emerald-500 text-white" >
           <option value="">-- Pilih Pembeli --</option>
           {% for b in buyers %}
             <option value="{{ b.id }}">{{ b.name }}{% if b.phone_e164 %} ({{ b.phone_e164 }}){% endif %}</option>
@@ -38,10 +33,15 @@
   <!-- Form item -->
   <section class="bg-white rounded-lg shadow-sm p-4 space-y-3">
     <h2 class="font-medium">Tambah Barang</h2>
-    <div class="grid grid-cols-2 gap-3">
-      <div class="col-span-2">
+    <div class="grid grid-cols-2 gap-3 text-sm">
+      <div class="col-span-2 relative">
         <label class="block text-sm mb-1">Nama Barang</label>
-        <input id="nama" type="text" placeholder="Contoh: Indomie Goreng" class="w-full px-3 py-2 border rounded" />
+        <input id="nama" type="text" placeholder="Contoh: Indomie Goreng" class="w-full px-3 py-2 border rounded" autocomplete="off"/>
+  <!-- dropdown suggestions -->
+  <div id="sugBox"
+       class="absolute mt-1 left-0 right-0 bg-white border rounded shadow z-20 max-h-60 overflow-auto hidden">
+    <!-- item di-render via JS -->
+  </div>
       </div>
       <div>
         <label class="block text-sm mb-1">Harga Beli /unit</label>
@@ -69,12 +69,12 @@
         <thead class="bg-gray-100">
           <tr class="text-left">
             <th class="py-2 px-2">Barang</th>
-            <th class="py-2 px-2 text-right">HB</th>
-            <th class="py-2 px-2 text-right">HJ</th>
+            <th class="py-2 px-2 text-right hidden md:table-cell">HB</th>
+            <th class="py-2 px-2 text-right hidden md:table-cell">HJ</th>
             <th class="py-2 px-2 text-right">Qty</th>
-            <th class="py-2 px-2 text-right">Penjualan</th>
-            <th class="py-2 px-2 text-right">Modal</th>
-            <th class="py-2 px-2 text-right">Laba</th>
+            <th class="py-2 px-2 text-right">Total</th>
+            <th class="py-2 px-2 text-right hidden md:table-cell">Modal</th>
+            <th class="py-2 px-2 text-right hidden md:table-cell">Laba</th>
             <th class="py-2 px-2"></th>
           </tr>
         </thead>
@@ -86,16 +86,19 @@
   <!-- Ringkasan + Bayar -->
   <section class="bg-white rounded-lg shadow-sm p-4 space-y-3">
     <h2 class="font-medium">Ringkasan</h2>
-    <div class="grid grid-cols-3 gap-3 text-sm">
+    <div class="grid grid-cols-1 gap-3 text-sm text-right bg-yellow-500 text-white">
       <div class="p-3 border rounded">
-        <div class="text-gray-500">Total Penjualan</div>
-        <div id="sumPenjualan" class="font-semibold">Rp 0</div>
+        <div class="text-gray-200">Total Penjualan</div>
+        <div id="sumPenjualan" class="font-semibold text-xl">Rp 0</div>
       </div>
-      <div class="p-3 border rounded">
+    </div>
+
+    <div class="grid grid-cols-2 gap-3 text-sm">
+      <div class="p-1 border rounded text-right">
         <div class="text-gray-500">Total Modal</div>
         <div id="sumModal" class="font-semibold">Rp 0</div>
       </div>
-      <div class="p-3 border rounded">
+      <div class="p-1 border rounded">
         <div class="text-gray-500">Total Laba</div>
         <div id="sumLaba" class="font-semibold">Rp 0</div>
       </div>
@@ -111,7 +114,7 @@
     <h3 class="text-lg font-semibold">Pembayaran</h3>
     <div class="text-sm">
       <div class="text-gray-500">Total</div>
-      <div id="totalBayar" class="font-semibold">Rp 0</div>
+      <div id="totalBayar" class="font-semibold text-xl">Rp 0</div>
     </div>
     <div>
       <label class="block text-sm mb-1">Jumlah Bayar</label>
@@ -119,11 +122,19 @@
     </div>
     <div class="text-sm">
       <div class="text-gray-500">Kembalian</div>
-      <div id="kembalian" class="font-semibold">Rp 0</div>
+      <div id="kembalian" class="font-semibold text-md">Rp 0</div>
     </div>
     <div class="flex gap-2">
       <button class="flex-1 py-2 rounded border" value="cancel">Batal</button>
-      <button id="btnConfirm" type="button" class="flex-1 py-2 rounded bg-blue-600 text-white hover:bg-blue-700">Konfirmasi</button>
+      <button id="btnConfirm" type="button"
+        class="flex-1 py-2 rounded bg-emerald-600 text-white hover:bg-emerald-700 inline-flex items-center justify-center gap-2">
+  <svg data-spinner class="w-4 h-4 animate-spin hidden" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4A4 4 0 008 12H4z"></path>
+  </svg>
+  <span data-label>Bayar</span>
+</button>
+<!--button id="btnConfirm" type="button" class="flex-1 py-2 rounded bg-blue-600 text-white hover:bg-blue-700">Konfirmasi</button-->
     </div>
   </form>
 </dialog>
@@ -166,6 +177,79 @@ function escapeHtml(s = '') {
     saveCart(cart); refresh();
   }
 
+  // ===== Typeahead Barang =====
+  const sugBox = document.getElementById('sugBox');
+  const namaInput = document.getElementById('nama');
+
+  // debounce util
+  function debounce(fn, ms=200){
+    let t; return (...args)=>{ clearTimeout(t); t = setTimeout(()=>fn(...args), ms); };
+  }
+
+  function hideSug(){ sugBox.classList.add('hidden'); sugBox.innerHTML=''; }
+  function showSug(){ sugBox.classList.remove('hidden'); }
+
+  async function fetchSuggest(q){
+    try{
+      const url = new URL("{{ url_for('api_items_suggest') }}", location.origin);
+      if (q) url.searchParams.set('q', q);
+      const r = await fetch(url);
+      const js = await r.json();
+      if (!js.ok) return [];
+      return js.items || [];
+    }catch(e){ console.warn(e); return []; }
+  }
+
+  function renderSuggest(items){
+    if (!items.length){ hideSug(); return; }
+    const frag = document.createDocumentFragment();
+    items.forEach(it=>{
+      const div = document.createElement('div');
+      div.className = 'sug-item';
+      div.innerHTML = `
+        <div class="flex items-center justify-between">
+          <div class="font-medium">${it.name}</div>
+          <div class="sug-meta">${it.last_sold ? it.last_sold : ''}</div>
+        </div>
+        <div class="sug-meta">Terakhir: ${fmtIDR.format(it.last_sale_price)} · Rata2: ${fmtIDR.format(it.avg_sale_price)}</div>
+      `;
+      div.addEventListener('click', () => applySuggestion(it));
+      frag.appendChild(div);
+    });
+    sugBox.innerHTML = '';
+    sugBox.appendChild(frag);
+    showSug();
+  }
+
+  function applySuggestion(it){
+    // Isi nama & harga default ke form
+    namaInput.value = it.name;
+    // gunakan harga terakhir (bisa diganti: avg)
+    document.getElementById('jual').value = it.last_sale_price || it.avg_sale_price || '';
+    document.getElementById('beli').value = it.last_cost_price || it.avg_cost_price || '';
+    document.getElementById('qty').focus();
+    hideSug();
+  }
+
+  // event: ketika input berubah -> cari
+  const onNamaInput = debounce(async ()=>{
+    const q = namaInput.value.trim().toLowerCase();
+    // jika kosong → tampilkan Top N (tanpa q), kalau ada → by prefix
+    const items = await fetchSuggest(q);
+    renderSuggest(items);
+  }, 250);
+
+  namaInput.addEventListener('input', onNamaInput);
+  namaInput.addEventListener('focus', onNamaInput);
+  document.addEventListener('click', (e)=>{
+    if (!sugBox.contains(e.target) && e.target !== namaInput) hideSug();
+  });
+
+  // opsional: keyboard nav (enter/esc tutup)
+  namaInput.addEventListener('keydown', (e)=>{
+    if (e.key === 'Escape') hideSug();
+  });
+
   function addItem(){
     if(!cart.buyer){ alert('Pilih pembeli dulu'); return; }
     const nama = document.getElementById('nama').value.trim();
@@ -193,13 +277,13 @@ function escapeHtml(s = '') {
       tr.className = i%2?'bg-white':'bg-gray-50';
       tr.innerHTML = `
         <td class="py-2 px-2">${escapeHtml(it.nama)}</td>
-        <td class="py-2 px-2 text-right">${fmtIDR.format(it.beli)}</td>
-        <td class="py-2 px-2 text-right">${fmtIDR.format(it.jual)}</td>
+        <td class="py-2 px-2 text-right hidden md:table-cell">${fmtIDR.format(it.beli)}</td>
+        <td class="py-2 px-2 text-right hidden md:table-cell">${fmtIDR.format(it.jual)}</td>
         <td class="py-2 px-2 text-right">${it.qty}</td>
         <td class="py-2 px-2 text-right">${fmtIDR.format(penjualan)}</td>
-        <td class="py-2 px-2 text-right">${fmtIDR.format(modal)}</td>
-        <td class="py-2 px-2 text-right ${laba>=0?'text-emerald-600':'text-rose-600'} font-semibold">${fmtIDR.format(laba)}</td>
-        <td class="py-2 px-2 text-right"><button class="text-xs px-2 py-1 border rounded hover:bg-gray-100" onclick="delItem(${i})">Hapus</button></td>`;
+        <td class="py-2 px-2 text-right hidden md:table-cell">${fmtIDR.format(modal)}</td>
+        <td class="py-2 px-2 text-right ${laba>=0?'text-emerald-600':'text-rose-600'} font-semibold hidden md:table-cell">${fmtIDR.format(laba)}</td>
+        <td class="py-2 px-2 text-right"><button class="text-xs px-2 py-1 border rounded bg-red-500 text-white hover:bg-red-700" onclick="delItem(${i})">Hapus</button></td>`;
       tb.appendChild(tr);
     });
     const {total,modal,laba}=calcTotals(cart.items);
@@ -223,34 +307,80 @@ function escapeHtml(s = '') {
     const kembali = Math.max(0, bayar-total);
     document.getElementById('kembalian').textContent = fmtIDR.format(kembali);
   }
+
+  // toggle loading di tombol
+  function setBtnLoading(btn, on, labelOn='Memproses...', labelOff='Konfirmasi'){
+    const sp = btn.querySelector('[data-spinner]');
+    const lb = btn.querySelector('[data-label]');
+    btn.disabled = !!on;
+    if (sp) sp.classList.toggle('hidden', !on);
+    if (lb) lb.textContent = on ? labelOn : labelOff;
+    btn.classList.toggle('opacity-50', !!on);
+    btn.classList.toggle('cursor-not-allowed', !!on);
+  }
+
+  // cegah klik ganda
+  let inFlightPay = false;
+
   async function confirmBayar(){
+    if (inFlightPay) return; // sudah proses
+
     const tgl = document.getElementById('tgl').value;
     const bayar = Number(document.getElementById('inputBayar').value||0);
     const {total}=calcTotals(cart.items);
+
+    if(!cart.buyer){ alert('Pilih pembeli dulu'); return; }
+    if(!cart.items.length){ alert('Keranjang kosong'); return; }
     if(bayar<total){ alert('Jumlah bayar kurang dari total'); return; }
+
+    // Konfirmasi dulu
+    if (!confirm('Proses pembayaran dan simpan transaksi?')) return;
+
+    // siapkan payload + idempotency token (anti-dobel server)
+    const clientToken = 'ct-' + Date.now() + '-' + Math.random().toString(36).slice(2);
     const payload = {
       tgl,
       buyer_id: cart.buyer.id,
       items: cart.items,
-      paid_amount: bayar
+      paid_amount: bayar,
+      client_token: clientToken
     };
-    const r = await fetch("{{ url_for('penjualan') }}", {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify(payload)
-    });
-    const js = await r.json();
-    if(!js.ok){
-      alert(js.error || 'Gagal menyimpan transaksi');
-      return;
+
+    const btn = document.getElementById('btnConfirm');
+    inFlightPay = true;
+    setBtnLoading(btn, true);
+
+    try{
+      const r = await fetch("{{ url_for('penjualan') }}", {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(payload)
+      });
+      const js = await r.json().catch(()=>({ok:false,error:'Respon tidak valid'}));
+
+      if (!js.ok) {
+        alert(js.error || 'Gagal menyimpan transaksi');
+        return;
+      }
+
+      // reset keranjang
+      cart.items = [];
+      saveCart(cart);
+      refresh();
+      document.getElementById('dlg').close();
+      alert('Pembayaran berhasil. ID Transaksi: '+js.sale_id);
+
+    } catch(e){
+      console.error(e);
+      alert('Terjadi kesalahan jaringan/server.');
+    } finally {
+      inFlightPay = false;
+      setBtnLoading(btn, false);
     }
-    // reset keranjang
-    cart.items = [];
-    saveCart(cart);
-    refresh();
-    document.getElementById('dlg').close();
-    alert('Pembayaran berhasil. ID Transaksi: '+js.sale_id);
   }
+
+  // pastikan event listener tetap
+  document.getElementById('btnConfirm').addEventListener('click', confirmBayar);
 
   // init
   document.getElementById('buyer').addEventListener('change', onBuyerChange);

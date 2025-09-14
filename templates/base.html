@@ -6,12 +6,13 @@
   <title>{{ page_title or 'Kelontong' }}</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="min-h-screen bg-gray-50 text-gray-900">
+<body class="min-h-screen bg-emerald-50 text-gray-900">
   <header class="sticky top-0 z-10 bg-white/90 backdrop-blur border-b">
     <div class="max-w-screen-sm mx-auto px-4 py-3 flex items-center justify-between">
       <a href="{{ url_for('penjualan') }}" class="font-medium">Kelontong</a>
       {% if session.get('user') %}
       <form method="post" action="{{ url_for('logout') }}">
+<span>👤 {{ session.get('user',{}).get('username') }} </span>
         <button class="text-sm px-3 py-1.5 rounded border hover:bg-gray-100">Keluar</button>
       </form>
       {% endif %}
@@ -30,6 +31,42 @@
         </div>
       {% endif %}
     {% endwith %}
+<div class="space-y-6">
+
+  <!-- Header nav kecil -->
+  <div class="flex items-center justify-between">
+  <nav class="overflow-x-auto whitespace-nowrap -mx-1">
+    <div class="inline-flex items-center px-1 py-1 bg-white rounded-full border w-full text-sm">
+      <a href="{{ url_for('penjualan') }}"
+         class="inline-flex items-center gap-1 px-2 py-1.5 rounded-full border transition
+                {{ 'bg-blue-50 border-blue-300 text-blue-700 font-medium' if request.endpoint=='penjualan' else 'border-transparent text-gray-700 hover:bg-gray-50' }}"
+         {{ 'aria-current=page' if request.endpoint=='penjualan' }}>
+        <span>🛒Penjualan</span>
+      </a>
+
+      <a href="{{ url_for('pembeli_page') }}"
+         class="inline-flex items-center gap-1 px-2 py-1.5 rounded-full border transition
+                {{ 'bg-blue-50 border-blue-300 text-blue-700 font-medium' if request.endpoint=='pembeli_page' else 'border-transparent text-gray-700 hover:bg-gray-50' }}"
+         {{ 'aria-current=page' if request.endpoint=='pembeli_page' }}>
+        <span>👥Pembeli</span>
+      </a>
+
+      <a href="{{ url_for('pemodal_page') }}"
+         class="inline-flex items-center gap-1 px-2 py-1.5 rounded-full border transition
+                {{ 'bg-blue-50 border-blue-300 text-blue-700 font-medium' if request.endpoint=='pemodal_page' else 'border-transparent text-gray-700 hover:bg-gray-50' }}"
+         {{ 'aria-current=page' if request.endpoint=='pemodal_page' }}>
+        <span>💰Pemodal</span>
+      </a>
+
+      <a href="{{ url_for('laporan_page') }}"
+         class="inline-flex items-center gap-1 px-2 py-1.5 rounded-full border transition
+                {{ 'bg-blue-50 border-blue-300 text-blue-700 font-medium' if request.endpoint=='laporan_page' else 'border-transparent text-gray-700 hover:bg-gray-50' }}"
+         {{ 'aria-current=page' if request.endpoint=='laporan_page' }}>
+        <span>📊Laporan</span>
+      </a>
+    </div>
+  </nav>
+  </div>
 
     {{ body|safe }}
     {% block content %}{% endblock %}

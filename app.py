@@ -38,7 +38,23 @@ def db_conn():
     """Ambil koneksi dari pool. Gunakan: with db_conn() as conn: ..."""
     if not db_pool:
         raise RuntimeError("DATABASE_URL belum diset. Cek .env")
+
+#    with db_pool.connection() as conn:
+#        try:
+#            with conn.cursor() as cur:
+#                # pakai TZ dari Config (default: Asia/Jakarta)
+#                cur.execute("SET TIME ZONE %s", (app.config["TZ"],))
+#        except Exception as e:
+#            # tidak fatal, tapi log supaya kelihatan kalau gagal
+#            app.logger.warning("SET TIME ZONE gagal: %s", e)
+#        yield conn
     return db_pool.connection()
+
+#with db_conn() as conn:
+#    with conn.cursor() as cur:
+#        cur.execute("SELECT now(), current_setting('TimeZone')")
+#        app.logger.debug("DB now=%s TZ=%s", *cur.fetchone())
+
 
 # =========================
 # Auth utils (user statis)
@@ -263,6 +279,56 @@ def penjualan_save():
 
     return {"ok": True, "sale_id": sale_id}
 
+@app.get("/api/items/suggest")
+@login_required
+def api_items_suggest():
+    """
+    Query param:
+      - q: prefix nama barang (case-insensitive). kosong -> item terlaris terbaru
+      - limit: default 12
+    """
+    q = (request.args.get("q") or "").strip().lower()
+    limit = min(int(request.args.get("limit") or 12), 50)
+
+    rows = []
+    try:
+      with db_conn() as conn:
+        with conn.cursor() as cur:
+          if q:
+            cur.execute("""
+              SELECT item_key, last_name, last_sale_price, last_cost_price,
+                     avg_sale_price, avg_cost_price, times, total_qty, last_sold
+              FROM v_item_suggest
+              WHERE item_key LIKE %s
+              ORDER BY times DESC, last_sold DESC
+              LIMIT %s
+            """, (q + "%", limit))
+          else:
+            cur.execute("""
+              SELECT item_key, last_name, last_sale_price, last_cost_price,
+                     avg_sale_price, avg_cost_price, times, total_qty, last_sold
+              FROM v_item_suggest
+              ORDER BY times DESC, last_sold DESC
+              LIMIT %s
+            """, (limit,))
+          for r in cur.fetchall():
+            rows.append({
+              "item_key": r[0],
+              "name": r[1],
+              "last_sale_price": int(r[2] or 0),
+              "last_cost_price": int(r[3] or 0),
+              "avg_sale_price": int(r[4] or 0),
+              "avg_cost_price": int(r[5] or 0),
+              "times": int(r[6] or 0),
+              "total_qty": int(r[7] or 0),
+              "last_sold": r[8].isoformat() if r[8] else None
+            })
+    except Exception as e:
+      app.logger.exception("items suggest failed: %s", e)
+      return {"ok": False, "error": "DB error"}, 500
+
+    return {"ok": True, "items": rows}
+
 # Hanya jika belum ada
 @app.route("/pembeli", methods=["GET", "POST"])
 @login_required
@@ -420,25 +486,54 @@ def laporan_page():
     today = date.today().isoformat()
     from_date = request.args.get("from") or today
     to_date   = request.args.get("to")   or today
+    # Normalisasi range (tukar jika from>to)
+    try:
+        fd = datetime.fromisoformat(from_date).date()
+        td = datetime.fromisoformat(to_date).date()
+        if fd > td:
+            fd, td = td, fd
+            from_date, to_date = fd.isoformat(), td.isoformat()
+    except Exception:
+        pass
 
     # 1) Bagi hasil via function f_profit_sharing(from,to)
-    profit = None
+    
+    profit_data = {
+        "range_from": from_date,
+        "range_to": to_date,
+        "total_laba": 0,
+        "share_karyawan": 0,
+        "share_pemodal": 0,
+        "share_kas": 0,
+    }
+
+    app.logger.debug("[PS] range: %s .. %s", from_date, to_date)
     try:
         with db_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT * FROM f_profit_sharing(%s,%s)", (from_date, to_date))
                 row = cur.fetchone()
+                app.logger.debug("[PS] f_profit_sharing row: %r", row)  # [LOG PS]
                 if row:
-                    # (range_from, range_to, total_laba, share_karyawan, share_pemodal, share_kas)
-                    profit = {
+                    profit_data.update({
                         "range_from": row[0],
                         "range_to": row[1],
                         "total_laba": int(row[2] or 0),
                         "share_karyawan": int(row[3] or 0),
                         "share_pemodal": int(row[4] or 0),
-                        "share_kas": int(row[5] or 0)
-                    }
+                        "share_kas": int(row[5] or 0),
+                    })
+                    # (range_from, range_to, total_laba, share_karyawan, share_pemodal, share_kas)
+                    #profit = {
+                    #    "range_from": row[0],
+                    #    "range_to": row[1],
+                    #    "total_laba": int(row[2] or 0),
+                    #    "share_karyawan": int(row[3] or 0),
+                    #    "share_pemodal": int(row[4] or 0),
+                    #    "share_kas": int(row[5] or 0)
+                    #}
     except Exception as e:
+        app.logger.info("f_profit_sharing unavailable: %s", e)
         app.logger.warning("f_profit_sharing error: %s. Fallback aggregate sales.", e)
         # fallback jika function belum ada: hitung dari tabel sales
         try:
@@ -450,7 +545,7 @@ def laporan_page():
                         WHERE sale_date BETWEEN %s AND %s
                     """, (from_date, to_date))
                     total = int(cur.fetchone()[0] or 0)
-                    profit = {
+                    profit_data = {
                         "range_from": from_date,
                         "range_to": to_date,
                         "total_laba": total,
@@ -460,8 +555,15 @@ def laporan_page():
                     }
         except Exception as ee:
             app.logger.exception("fallback profit failed: %s", ee)
-            profit = None
-
+#            profit = None
+    app.logger.debug("[PS] result: %s", profit_data)
+    # --- siapkan angka yang dikirim ke template (hindari kirim dict) ---
+    ps_total = int(profit_data.get("total_laba", 0))
+    ps_emp   = int(profit_data.get("share_karyawan", 0))
+    ps_inv   = int(profit_data.get("share_pemodal", 0))
+    ps_cash  = int(profit_data.get("share_kas", 0))
+    app.logger.debug("[PS] final numbers: total=%s emp=%s inv=%s cash=%s",
+                     ps_total, ps_emp, ps_inv, ps_cash)
     # 2) Rekap harian via view v_sales_by_day
     rekap = []
     try:
@@ -550,7 +652,8 @@ def laporan_page():
         "laporan.html",
         from_date=from_date,
         to_date=to_date,
-        profit=profit,
+        ps_total=ps_total, ps_emp=ps_emp, ps_inv=ps_inv, ps_cash=ps_cash,
+        #profit_ps=profit,
         rekap=rekap,
         trx=trx
     )
@@ -623,8 +726,16 @@ def laporan_resend_wa(sale_id):
         with db_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
-                    SELECT s.sale_date, COALESCE(b.name,'') AS buyer_name, COALESCE(b.phone_e164,'') AS phone,
-                           s.total_amount, s.paid_amount, s.change_amount
+                    SELECT s.sale_date,
+                           COALESCE(b.name,'') AS buyer_name,
+                           COALESCE(b.phone_e164,'') AS phone,
+                           s.total_amount, s.paid_amount, s.change_amount,
+                           s.wa_status, s.wa_sent_at,
+                           CASE
+                             WHEN s.wa_sent_at IS NULL THEN FALSE
+                             WHEN (now() - s.wa_sent_at) < interval '30 seconds' THEN TRUE
+                             ELSE FALSE
+                           END AS recently_sent
                     FROM sales s
                     LEFT JOIN buyers b ON b.id = s.buyer_id
                     WHERE s.id = %s
@@ -632,7 +743,11 @@ def laporan_resend_wa(sale_id):
                 row = cur.fetchone()
                 if not row:
                     return {"ok": False, "error": "Transaksi tidak ditemukan"}, 404
-                sale_date, buyer_name, phone, total_amount, paid_amount, change_amount = row
+
+                (sale_date, buyer_name, phone,
+                 total_amount, paid_amount, change_amount,
+                 wa_status, wa_sent_at, recently_sent) = row
+
 
                 cur.execute("""
                     SELECT item_name, sale_price, qty
@@ -647,6 +762,8 @@ def laporan_resend_wa(sale_id):
 
     if not phone:
         return {"ok": False, "error": "Pembeli tidak punya nomor WA"}, 400
+    if recently_sent:
+        return {"ok": False, "error": "Nota baru saja dikirim. Coba lagi dalam 30 detik."}, 409
 
     # Build teks nota
     message_text = build_receipt_text(

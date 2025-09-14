@@ -2,17 +2,7 @@
 {% set page_title = "Laporan" %}
 
 {% block content %}
-<div class="space-y-6">
 
-
-  <div class="flex items-center justify-between">
-    <nav class="text-sm text-gray-600">
-      <a class="mr-3 hover:underline" href="{{ url_for('penjualan') }}">Penjualan</a>
-      <a class="mr-3 hover:underline" href="{{ url_for('pembeli_page') }}">Pembeli</a>
-      <a class="mr-3 hover:underline" href="{{ url_for('pemodal_page') }}">Pemodal</a>
-      <a class="hover:underline" href="{{ url_for('laporan_page') }}">Laporan</a>
-    </nav>
-  </div>
 
   <!-- Filter tanggal (berdampak ke Bagi Hasil & Rekap) -->
   <section class="bg-white rounded-lg shadow-sm p-4 space-y-3">
@@ -39,30 +29,27 @@
       <span class="text-xs text-gray-500">Sumber: f_profit_sharing()</span>
     </div>
 
-{% if profit %}
+<!-- DEBUG PS: total={{ ps_total }} emp={{ ps_emp }} inv={{ ps_inv }} cash={{ ps_cash }} -->
+
 <div class="grid grid-cols-4 gap-3 text-sm">
   <div class="p-3 border rounded">
     <div class="text-gray-500">Total Laba</div>
-    <div class="font-semibold">{{ profit.total_laba|rupiah }}</div>
+    <div class="font-semibold">{{ ps_total | default(0) | rupiah }}</div>
   </div>
   <div class="p-3 border rounded">
     <div class="text-gray-500">Karyawan (30%)</div>
-    <div class="font-semibold">{{ profit.share_karyawan|rupiah }}</div>
+    <div class="font-semibold">{{ ps_emp | default(0) | rupiah }}</div>
   </div>
   <div class="p-3 border rounded">
     <div class="text-gray-500">Pemodal (35%)</div>
-    <div class="font-semibold">{{ profit.share_pemodal|rupiah }}</div>
+    <div class="font-semibold">{{ ps_inv | default(0) | rupiah }}</div>
   </div>
   <div class="p-3 border rounded">
     <div class="text-gray-500">Kas (35%)</div>
-    <div class="font-semibold">{{ profit.share_kas|rupiah }}</div>
+    <div class="font-semibold">{{ ps_cash | default(0) | rupiah }}</div>
   </div>
 </div>
-{% else %}
-  <div class="p-3 rounded border border-amber-300 bg-amber-50 text-amber-800 text-sm">
-    Tidak ada data laba pada rentang ini.
-  </div>
-{% endif %}
+
 
   </section>
 
@@ -79,8 +66,8 @@
           <tr class="text-left">
             <th class="py-2 px-2">Tanggal</th>
             <th class="py-2 px-2 text-right">Transaksi</th>
-            <th class="py-2 px-2 text-right">Penjualan</th>
-            <th class="py-2 px-2 text-right">Modal</th>
+            <th class="py-2 px-2 text-right">Total</th>
+            <th class="py-2 px-2 text-right hidden md:table-cell">Modal</th>
             <th class="py-2 px-2 text-right">Laba</th>
           </tr>
         </thead>
@@ -88,9 +75,9 @@
           {% for r in rekap %}
           <tr class="{{ 'bg-white' if loop.index0 % 2 else 'bg-gray-50' }}">
             <td class="py-2 px-2">{{ r.day }}</td>
-            <td class="py-2 px-2 text-right">{{ r.trx_count|rupiah }}</td>
+            <td class="py-2 px-2 text-right">{{ r.trx_count }}</td>
             <td class="py-2 px-2 text-right">{{ r.total_penjualan|rupiah }}</td>
-            <td class="py-2 px-2 text-right">{{ r.total_modal|rupiah }}</td>
+            <td class="py-2 px-2 text-right hidden md:table-cell">{{ r.total_modal|rupiah }}</td>
             <td class="py-2 px-2 text-right">{{ r.total_laba|rupiah }}</td>
           </tr>
           {% else %}
@@ -103,7 +90,7 @@
             <td class="py-2 px-2 text-right">TOTAL</td>
             <td class="py-2 px-2 text-right">{{ rekap|map(attribute='trx_count')|sum }}</td>
             <td class="py-2 px-2 text-right">{{ (rekap|map(attribute='total_penjualan')|sum)|rupiah }}</td>
-            <td class="py-2 px-2 text-right">{{ (rekap|map(attribute='total_modal')|sum)|rupiah }}</td>
+            <td class="py-2 px-2 text-right hidden md:table-cell">{{ (rekap|map(attribute='total_modal')|sum)|rupiah }}</td>
             <td class="py-2 px-2 text-right">{{ (rekap|map(attribute='total_laba')|sum)|rupiah }}</td>
           </tr>
         </tfoot>
@@ -125,11 +112,11 @@
           <tr class="text-left">
             <th class="py-2 px-2">Tanggal</th>
             <th class="py-2 px-2">Pembeli</th>
-            <th class="py-2 px-2 text-right">Penjualan</th>
-            <!--th class="py-2 px-2 text-right">Modal</th>
-            <th class="py-2 px-2 text-right">Laba</th-->
-            <th class="py-2 px-2 text-right">Bayar</th>
-            <!--th class="py-2 px-2 text-right">Kembali</th-->
+            <th class="py-2 px-2 text-right">Total</th>
+            <th class="py-2 px-2 text-right hidden md:table-cell">Modal</th>
+            <th class="py-2 px-2 text-right hidden md:table-cell">Laba</th>
+            <th class="py-2 px-2 text-right hidden md:table-cell">Bayar</th>
+            <!--th class="py-2 px-2 text-right hidden md:table-cell">Kembali</th-->
             <th class="py-2 px-2">WA</th>
             <th class="py-2 px-2 text-right">Aksi</th>
           </tr>
@@ -140,29 +127,46 @@
             <td class="py-2 px-2 whitespace-nowrap">{{ t.sale_date }}</td>
             <td class="py-2 px-2">{{ t.buyer_name or '-' }}</td>
             <td class="py-2 px-2 text-right">{{ t.total_amount|rupiah }}</td>
-            <!--td class="py-2 px-2 text-right">{{ t.total_cost|rupiah }}</td>
-            <td class="py-2 px-2 text-right">{{ t.total_profit|rupiah }}</td-->
-            <td class="py-2 px-2 text-right">{{ t.paid_amount|rupiah }}</td>
-            <!--td class="py-2 px-2 text-right">{{ t.change_amount|rupiah }}</td-->
+            <td class="py-2 px-2 text-right hidden md:table-cell">{{ t.total_cost|rupiah }}</td>
+            <td class="py-2 px-2 text-right hidden md:table-cell">{{ t.total_profit|rupiah }}</td>
+            <td class="py-2 px-2 text-right hidden md:table-cell">{{ t.paid_amount|rupiah }}</td>
+            <!--td class="py-2 px-2 text-right hidden md:table-cell">{{ t.change_amount|rupiah }}</td-->
             <td class="py-2 px-2">
-              <span class="text-xs px-2 py-1 rounded border
+
+  <button class="text-xs px-2 py-1 border rounded bg-emerald-500 text-white hover:bg-emerald-100 inline-flex items-center gap-2
+                 {% if t.wa_status == 'none' %} opacity-50 cursor-not-allowed {% endif %}"
+          data-sale-id="{{ t.id }}" onclick="resendWA(this)"
+          {% if t.wa_status == 'none' %} disabled {% endif %}>
+    <svg data-spinner class="w-3.5 h-3.5 text-white" viewBox="0 0 32 32" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+  <path d="M16.04 2.003a13.966 13.966 0 00-11.89 21.012l-2.122 6.194 6.402-2.07a13.962 13.962 0 006.327 1.543h.006c7.727 0 14.012-6.28 14.015-14.002A13.936 13.936 0 0016.04 2.003zm.005 25.313a11.51 11.51 0 01-5.763-1.566l-.414-.246-3.8 1.228 1.229-3.705-.27-.432a11.472 11.472 0 01-1.716-6.034c.002-6.363 5.18-11.548 11.553-11.548 3.084.002 5.983 1.202 8.164 3.385a11.48 11.48 0 013.39 8.16c-.002 6.37-5.187 11.548-11.573 11.548zm6.36-8.676c-.35-.176-2.073-1.02-2.395-1.136-.321-.117-.555-.176-.789.176s-.905 1.136-1.108 1.373c-.204.235-.402.264-.752.088-.35-.176-1.48-.545-2.82-1.738-1.042-.93-1.742-2.078-1.946-2.43-.204-.353-.022-.543.154-.718.158-.156.35-.406.526-.608.176-.203.233-.353.35-.587.117-.234.059-.44-.03-.617-.088-.176-.789-1.9-1.08-2.606-.284-.682-.573-.59-.789-.6-.205-.009-.44-.011-.676-.011s-.617.088-.94.44c-.321.353-1.235 1.21-1.235 2.955 0 1.743 1.264 3.428 1.441 3.664.176.234 2.489 3.797 6.033 5.324.843.364 1.5.58 2.013.742.846.27 1.616.232 2.225.141.679-.101 2.073-.848 2.364-1.665.293-.818.293-1.519.205-1.665-.088-.146-.322-.234-.673-.41z"/>
+</svg>
+
+    <span data-label>WA</span>
+  </button>
+              <!--span class="text-xs px-2 py-1 rounded border
                 {% if t.wa_status=='sent' %} border-emerald-300 bg-emerald-50 text-emerald-700
                 {% elif t.wa_status=='failed' %} border-rose-300 bg-rose-50 text-rose-700
                 {% elif t.wa_status=='pending' %} border-amber-300 bg-amber-50 text-amber-800
                 {% else %} border-gray-300 bg-gray-50 text-gray-700 {% endif %}">
                 {{ t.wa_status }}
-              </span>
+              </span-->
             </td>
-            <td class="py-2 px-2 text-right">
-              <button class="text-xs px-2 py-1 border rounded hover:bg-gray-100"
-                      data-sale-id="{{ t.id }}" onclick="openDetail(this)">Detail</button>
-  <button class="text-xs px-2 py-1 border rounded hover:bg-gray-100
+            <td class="py-2 px-2 text-right space-x-2">
+  <button class="text-xs px-2 py-1 border rounded bg-gray-200 hover:bg-gray-100"
+          data-sale-id="{{ t.id }}" onclick="openDetail(this)">Detail</button>
+
+  <!--button class="text-xs px-2 py-1 border rounded bg-emerald-500 text-white hover:bg-emerald-100 inline-flex items-center gap-2
                  {% if t.wa_status == 'none' %} opacity-50 cursor-not-allowed {% endif %}"
           data-sale-id="{{ t.id }}" onclick="resendWA(this)"
           {% if t.wa_status == 'none' %} disabled {% endif %}>
-    Resend&nbsp;WA
-  </button>
-            </td>
+    <svg data-spinner class="w-3.5 h-3.5 animate-spin hidden" viewBox="0 0 24 24" fill="none">
+      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4A4 4 0 008 12H4z"></path>
+    </svg>
+    <span data-label>Resend&nbsp;WA</span>
+  </button-->
+</td>
+
           </tr>
           {% else %}
           <tr><td class="py-3 px-2 text-center text-gray-500" colspan="9">Tidak ada transaksi</td></tr>
@@ -234,28 +238,52 @@
   </script>
 <script>
   function toast(msg){ alert(msg); } // bisa diganti toast UI
+  // Toggle loading state pada tombol
+  function setLoading(btn, on){
+    const spinner = btn.querySelector('[data-spinner]');
+    const label   = btn.querySelector('[data-label]');
+    btn.disabled = !!on;
+    if (spinner) spinner.classList.toggle('hidden', !on);
+    if (label)   label.textContent = on ? 'Mengirim...' : 'Resend WA';
+    btn.classList.toggle('opacity-50', !!on);
+    btn.classList.toggle('cursor-not-allowed', !!on);
+  }
+
+  // Cegah klik ganda lintas tombol (per sale_id)
+  const inFlightResend = new Set();
 
   async function resendWA(btn){
     const id = btn.getAttribute('data-sale-id');
     if (!id) return;
+    if (inFlightResend.has(id)) return; // sudah proses
+    // Konfirmasi dulu
+    if (!confirm('Kirim ulang nota WhatsApp untuk transaksi ini?')) return;
+
+    inFlightResend.add(id);
+    setLoading(btn, true);
     try{
       btn.disabled = true;
       const r = await fetch(`{{ url_for('laporan_resend_wa', sale_id='__ID__') }}`.replace('__ID__', id), {
         method: 'POST'
       });
-      const js = await r.json();
+      const js = await r.json().catch(()=>({ok:false,error:'Response tidak valid'}));
+      if (r.status === 409) {
+        toast(js.error || 'Baru saja dikirim. Coba lagi beberapa detik lagi.');
+        return;
+      }
       if(!js.ok){
         toast(js.error || 'Gagal kirim ulang WA');
-      }else{
-        toast('WA dikirim ulang.');
-        // opsional: reload halaman agar status wa_status ter-update
-        location.reload();
+        return;
       }
+      toast('WA dikirim ulang.');
+      // Supaya status WA di tabel update:
+      location.reload();
     }catch(e){
       console.error(e);
       toast('Gagal kirim ulang WA');
     }finally{
-      btn.disabled = false;
+      inFlightResend.delete(id);
+      setLoading(btn, false);
     }
   }
 </script>
